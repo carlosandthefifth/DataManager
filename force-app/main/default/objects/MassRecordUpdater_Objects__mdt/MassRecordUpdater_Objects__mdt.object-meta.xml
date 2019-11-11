@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
-    <description>API Names of objects whose fields we want to update</description>
-    <label>MassRecordUpdater Object</label>
-    <pluralLabel>MassRecordUpdater Objects</pluralLabel>
-    <visibility>Public</visibility>
-</CustomObject>
