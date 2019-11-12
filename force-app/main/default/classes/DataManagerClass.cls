@@ -214,6 +214,7 @@ public without sharing class DataManagerClass {
         if (verb == 'Update' || verb == 'Upsert') {
             system.debug('updating or upserting...');
             try {
+                if (fields.size() <= 0)  throw new DataManagerClassException('fields size is zero');
                 system.debug('fields: ' + fields);
 
                 //build query 
@@ -238,6 +239,8 @@ public without sharing class DataManagerClass {
                 system.debug('3 query: ' + query);
 
                 objects = Database.query(query);
+                if (objects.size() <= 0)  throw new DataManagerClassException('objects size is zero');
+                
                 for (SObject obj : objects) {
                     Boolean CanUpdate = true;
                     system.debug('obj: ' + obj);
@@ -270,11 +273,12 @@ public without sharing class DataManagerClass {
                 String StrOps;
 
                 query = 'SELECT API_Field_Name__c, Comparative_Operator__c, Compare_API_Field_Name__c, Compare_Value__c, Data_Manager_ObjectId__c, Evaluate_Next_Criteria__c, Has_Criteria__c, Logical_Operator__c, New_Value__c, Suffix_Iterator__c, Value_Is_Blank__c FROM Data_Manager_Field__mdt WHERE Data_Manager_ObjectId__c = \''+ CustomMetaDataRecord + '\'';
-        
-
-            
+                    
                 fields = database.Query(query);
+                
+                if (fields.size() <= 0)  throw new DataManagerClassException('fields size is zero');
 
+                system.debug('fields: ' + fields);
                 for (Data_Manager_Field__mdt field : fields) {
                     StrOps = (String)field.New_Value__c;
                     System.debug('StrOps.indexOf(@): ' + StrOps.indexOf('@'));

@@ -24,7 +24,7 @@
             </layoutItems>
             <layoutItems>
                 <behavior>Edit</behavior>
-                <field>Data_Manager_Project_Name__c</field>
+                <field>Data_Manager_ProjectID__c</field>
             </layoutItems>
         </layoutColumns>
         <layoutColumns>

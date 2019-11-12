@@ -19,8 +19,8 @@
                 <field>Active__c</field>
             </layoutItems>
             <layoutItems>
-                <behavior>Required</behavior>
-                <field>Verb__c</field>
+                <behavior>Edit</behavior>
+                <field>Priority__c</field>
             </layoutItems>
         </layoutColumns>
         <layoutColumns>
@@ -59,6 +59,8 @@
         <detailHeading>false</detailHeading>
         <editHeading>false</editHeading>
         <layoutColumns/>
+        <layoutColumns/>
+        <layoutColumns/>
         <style>CustomLinks</style>
     </layoutSections>
     <relatedLists>
@@ -71,7 +73,7 @@
         <fields>MasterLabel</fields>
         <fields>DeveloperName</fields>
         <fields>NamespacePrefix</fields>
-        <relatedList>Data_Manager_Notification__mdt.Data_Manager_Project_Name__c</relatedList>
+        <relatedList>Data_Manager_Notification__mdt.Data_Manager_ProjectID__c</relatedList>
     </relatedLists>
     <showEmailCheckbox>false</showEmailCheckbox>
     <showHighlightsPanel>false</showHighlightsPanel>
