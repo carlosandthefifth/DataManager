@@ -2,7 +2,8 @@
 <ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Record_Count</fullName>
     <active>true</active>
-    <errorConditionFormula>IF( ISPICKVAL( Verb__c , &#39;Insert&#39;) ,  IF( Record_Count__c &lt;= 0 ||  ISNULL(Record_Count__c) , true, false) , false)</errorConditionFormula>
+    <description>On insert, we need a record count</description>
+    <errorConditionFormula>IF(OR(ISBLANK( Record_Count__c ),Record_Count__c = 0),  ISPICKVAL( Verb__c , &#39;Insert&#39;) , false)</errorConditionFormula>
     <errorDisplayField>Record_Count__c</errorDisplayField>
-    <errorMessage>Record count has to be greater than zero on insert</errorMessage>
+    <errorMessage>You must enter a the number of records for an insert</errorMessage>
 </ValidationRule>

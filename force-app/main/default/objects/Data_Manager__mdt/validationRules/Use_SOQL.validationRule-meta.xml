@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>Use_SOQL</fullName>
-    <active>true</active>
-    <description>Verb cannot be insert if we are using custom soql queries</description>
-    <errorConditionFormula>IF( ISPICKVAL( Verb__c , &#39;Insert&#39;) ,  Use_SOQL__c = TRUE, false)</errorConditionFormula>
-    <errorDisplayField>Use_SOQL__c</errorDisplayField>
-    <errorMessage>Cannot Use SOQL when verb is set to insert</errorMessage>
-</ValidationRule>

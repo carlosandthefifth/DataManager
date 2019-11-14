@@ -2,8 +2,8 @@
 <ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Compare_API_Field_Name</fullName>
     <active>true</active>
-    <description>If Has Criteria, we need the Compare API Field Name</description>
-    <errorConditionFormula>IF( Has_Criteria__c = TRUE,  ISBLANK( Compare_API_Field_Name__c ) , false)</errorConditionFormula>
+    <description>If using criteria, the comparative field api name cannot be blank</description>
+    <errorConditionFormula>IF( Has_Criteria__c == TRUE ,  ISBLANK( Compare_API_Field_Name__c ) , false)</errorConditionFormula>
     <errorDisplayField>Compare_API_Field_Name__c</errorDisplayField>
-    <errorMessage>When using Has Criteria, API Field Name cannot be blank</errorMessage>
+    <errorMessage>Comparative API Field name cannot be blank when Use Criteria is checked</errorMessage>
 </ValidationRule>

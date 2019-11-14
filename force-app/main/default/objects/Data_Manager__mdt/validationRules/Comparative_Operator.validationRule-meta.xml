@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Comparative_Operator</fullName>
+    <active>true</active>
+    <description>if we are using a criteria comparative operator cannot be blank</description>
+    <errorConditionFormula>IF( Has_Criteria__c ,  ISPICKVAL( Comparative_Operator__c, &#39;&#39;) , false)</errorConditionFormula>
+    <errorDisplayField>Comparative_Operator__c</errorDisplayField>
+    <errorMessage>Comparative operator cannot be blank</errorMessage>
+</ValidationRule>

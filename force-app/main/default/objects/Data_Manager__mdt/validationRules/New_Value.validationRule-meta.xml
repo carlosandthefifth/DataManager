@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>New_Value</fullName>
-    <active>true</active>
-    <description>If not Use SOQL and new value is blank is not checked, make sure that this is not blank</description>
-    <errorConditionFormula>IF( Use_SOQL__c = FALSE,  IF( New_Value_Is_Blank__c != FALSE,  IF( ISBLANK( New_Value__c ) , true, false) , false) , false)</errorConditionFormula>
-    <errorDisplayField>New_Value__c</errorDisplayField>
-    <errorMessage>New value is requied</errorMessage>
-</ValidationRule>
