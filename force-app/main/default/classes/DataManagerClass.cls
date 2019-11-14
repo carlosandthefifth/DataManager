@@ -82,7 +82,7 @@ public without sharing class DataManagerClass {
             // Build query for total records
             Parameters.add(DataManager.Object_API_Name__c);
             if(DataManager.Verb__c == 'Update') {
-                if((DataManager.Has_Criteria__c) && !(DataManager.Use_Query__c)) {
+                if((DataManager.Has_Criteria__c) && !(DataManager.Use_SOQL__c)) {
                     query = 'SELECT ID FROM {0} WHERE {1} {2} {3} LIMIT {4}';
                     // Get the operator
                     if (DataManager.Comparative_Operator__c == 'Equal')
@@ -105,20 +105,20 @@ public without sharing class DataManagerClass {
                     else
                         Parameters.add(DataManager.Compare_Value__c);
                 }  else {
-                    if (DataManager.Use_Query__c)
+                    if (DataManager.Use_SOQL__c)
                         query = DataManager.query__c;
                     else 
                         query = 'SELECT ID FROM {0} LIMIT {1}';
                 }
 
-                if (!DataManager.Use_Query__c) {
+                if (!DataManager.Use_SOQL__c) {
                     Parameters.add(string.valueOf(RowsPerTransaction_LIMIT - LIMITS.getQueryRows()));
 
                     query = string.format(query,Parameters);
                 }
 
                 system.debug('query: ' + query);
-                
+
                 try {
                     objects = database.query(query);
                 } catch (Exception e) {
