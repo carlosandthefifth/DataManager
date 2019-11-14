@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>New_Value__c</fullName>
+    <description>Enter new value for updates</description>
     <externalId>false</externalId>
     <fieldManageability>DeveloperControlled</fieldManageability>
+    <inlineHelpText>Enter new value for updates</inlineHelpText>
     <label>New Value</label>
     <length>255</length>
     <required>false</required>

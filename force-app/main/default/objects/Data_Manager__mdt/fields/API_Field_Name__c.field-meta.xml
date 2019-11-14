@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>API_Field_Name__c</fullName>
+    <description>The field name we want to update</description>
     <externalId>false</externalId>
     <fieldManageability>DeveloperControlled</fieldManageability>
+    <inlineHelpText>Field name to update</inlineHelpText>
     <label>API Field Name</label>
     <length>255</length>
     <required>false</required>

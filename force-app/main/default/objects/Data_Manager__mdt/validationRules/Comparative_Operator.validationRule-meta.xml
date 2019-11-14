@@ -3,7 +3,7 @@
     <fullName>Comparative_Operator</fullName>
     <active>true</active>
     <description>if we are using a criteria comparative operator cannot be blank</description>
-    <errorConditionFormula>IF( Has_Criteria__c ,  ISPICKVAL( Comparative_Operator__c, &#39;&#39;) , false)</errorConditionFormula>
+    <errorConditionFormula>IF( Use_Criteria__c ,  ISPICKVAL( Comparative_Operator__c, &#39;&#39;) , false)</errorConditionFormula>
     <errorDisplayField>Comparative_Operator__c</errorDisplayField>
     <errorMessage>Comparative operator cannot be blank</errorMessage>
 </ValidationRule>

@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>New_Value_Is_Blank__c</fullName>
+    <fullName>Email_Notification__c</fullName>
     <defaultValue>false</defaultValue>
-    <description>Enter if new value to update is blank</description>
     <externalId>false</externalId>
     <fieldManageability>DeveloperControlled</fieldManageability>
-    <inlineHelpText>Enter if new value to update is blank</inlineHelpText>
-    <label>New Value Is Blank</label>
+    <label>Email Notification</label>
     <type>Checkbox</type>
 </CustomField>

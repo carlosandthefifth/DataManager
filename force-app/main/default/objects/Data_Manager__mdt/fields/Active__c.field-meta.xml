@@ -2,6 +2,7 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Active__c</fullName>
     <defaultValue>false</defaultValue>
+    <description>Used to tell the program that this can be run.  Example use, you are using batch scheduling which runs all active Data Manager request.  You can use this field to choose which requests to run</description>
     <externalId>false</externalId>
     <fieldManageability>DeveloperControlled</fieldManageability>
     <label>Active</label>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Record_Count_Update</fullName>
+    <active>true</active>
+    <description>If we are just Updating, record count is not allowed</description>
+    <errorConditionFormula>IF( ISPICKVAL( Verb__c , &#39;Update&#39;) ,  IF( Record_Count__c &gt; 0, true, false) , false)</errorConditionFormula>
+    <errorDisplayField>Record_Count__c</errorDisplayField>
+    <errorMessage>Record count has to be zero or null on update</errorMessage>
+</ValidationRule>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Use_Query</fullName>
+    <active>true</active>
+    <description>Use Query OR Use Criteria can be used.  Use Query is designed to extend the basic criteria</description>
+    <errorConditionFormula>IF( AND( Use_Query__c , Use_Criteria__c) , true, false)</errorConditionFormula>
+    <errorDisplayField>Use_Query__c</errorDisplayField>
+    <errorMessage>You cannot have both Use Query and Use Criteria checked</errorMessage>
+</ValidationRule>

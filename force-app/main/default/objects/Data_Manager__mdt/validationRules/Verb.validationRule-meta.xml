@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Verb</fullName>
+    <active>true</active>
+    <description>Must have a value</description>
+    <errorConditionFormula>IF( ISPICKVAL( Verb__c , &#39;&#39;) , true, false)</errorConditionFormula>
+    <errorDisplayField>Verb__c</errorDisplayField>
+    <errorMessage>You must select an action</errorMessage>
+</ValidationRule>

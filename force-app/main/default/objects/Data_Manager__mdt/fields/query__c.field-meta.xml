@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>query__c</fullName>
+    <description>Use custom query for more than one comparison.  Example API Object Name is Account field to update is Rating to warm but only if status is Status is prospect and Type is Apparel.  Enter query select Status, Apparel, Rating from Account where Status = &#39;Prospect&#39; and Type=&#39;Apparel&#39;.  Set API Field Name to Rating and New Value to warm.</description>
     <externalId>false</externalId>
     <fieldManageability>DeveloperControlled</fieldManageability>
+    <inlineHelpText>Use queries for complex criteria solutions</inlineHelpText>
     <label>query</label>
     <required>false</required>
     <type>TextArea</type>

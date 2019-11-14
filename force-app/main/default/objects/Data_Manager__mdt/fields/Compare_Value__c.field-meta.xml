@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Compare_Value__c</fullName>
+    <description>The value that we are using for a criteria</description>
     <externalId>false</externalId>
     <fieldManageability>DeveloperControlled</fieldManageability>
+    <inlineHelpText>The value that we are using for a criteria.</inlineHelpText>
     <label>Compare Value</label>
     <length>255</length>
     <required>false</required>

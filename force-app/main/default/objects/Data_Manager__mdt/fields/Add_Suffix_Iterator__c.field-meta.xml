@@ -2,8 +2,10 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Add_Suffix_Iterator__c</fullName>
     <defaultValue>false</defaultValue>
+    <description>Add a number to test data.</description>
     <externalId>false</externalId>
     <fieldManageability>DeveloperControlled</fieldManageability>
+    <inlineHelpText>If you are using test as an update value for a name fields, setting this will add test + [some number]</inlineHelpText>
     <label>Add Suffix Iterator</label>
     <type>Checkbox</type>
 </CustomField>

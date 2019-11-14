@@ -70,11 +70,11 @@ public without sharing class DataManagerClass {
 
         if (ProjectName == '') {
             // Running all available projects
-            query = 'SELECT Verb__c, Compare_Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Has_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c, Use_Query__c FROM Data_Manager__mdt WHERE Active__c = true LIMIT ' + DMLPerTransaction_LIMIT;
+            query = 'SELECT Verb__c, Compare_Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Use_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c, Use_Query__c, Email_Recipient__c, Email_Notification__c FROM Data_Manager__mdt WHERE Active__c = true LIMIT ' + DMLPerTransaction_LIMIT;
         }
         else {
             // Select a specific project to run
-            query = 'SELECT Verb__c, Compare_Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Has_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c, Use_Query__c FROM Data_Manager__mdt WHERE Active__c = true  AND Label =:ProjectName LIMIT ' + DMLPerTransaction_LIMIT;
+            query = 'SELECT Verb__c, Compare_Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Use_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c, Use_Query__c, Email_Recipient__c, Email_Notification__c FROM Data_Manager__mdt WHERE Active__c = true  AND Label =:ProjectName LIMIT ' + DMLPerTransaction_LIMIT;
         }
         try {
             DataManagerList = database.query(query);
@@ -83,7 +83,7 @@ public without sharing class DataManagerClass {
                 // Build query for total records
                 Parameters.add(DataManager.Object_API_Name__c);
                 if(DataManager.Verb__c == 'Update') {
-                    if((DataManager.Has_Criteria__c) && !(DataManager.Use_Query__c)) {
+                    if((DataManager.Use_Criteria__c) && !(DataManager.Use_Query__c)) {
                         query = 'SELECT ID FROM {0} WHERE {1} {2} {3} LIMIT {4}';
                         // Get the operator
                         if (DataManager.Comparative_Operator__c == 'Equal')
@@ -169,14 +169,14 @@ public without sharing class DataManagerClass {
                 LastCount = 0;
                 for(Integer BatchKey : RecordsToInsert.keySet()) {
                     system.debug('RecordsToInsert.get(BatchKey): ' + RecordsToInsert.get(BatchKey));
-                        InsertRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, DataManager.Add_Suffix_Iterator__c,RecordsToInsert.get(BatchKey) , LastCount);
+                        InsertRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, DataManager.Add_Suffix_Iterator__c,RecordsToInsert.get(BatchKey) , LastCount, DataManager.Email_Notification__c, DataManager.Email_Recipient__c);
                         LastCount += RecordsToInsert.get(BatchKey);
                         if (LIMITS.getFutureCalls() + 1 > FuturePerTransaction_LIMIT) break; // we have reached the maximum number of future calls
                 }
 
                 for (Integer BatchKey : IDsToProcess.keySet()) {
                     system.debug('IDsToProcess.get(' + BatchKey + ').size(): ' + IDsToProcess.get(BatchKey).size());
-                    UpdateRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, IDsToProcess.get(BatchKey), DataManager.Add_Suffix_Iterator__c,IDsToProcess.get(BatchKey).Size(), LastCount, DataManager.Compare_Value__c,DataManager.Compare_API_Field_Name__c, DataManager.Compare_Value_Is_Blank__c, DataManager.New_Value_Is_Blank__c);
+                    UpdateRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, IDsToProcess.get(BatchKey), DataManager.Add_Suffix_Iterator__c,IDsToProcess.get(BatchKey).Size(), LastCount, DataManager.Compare_Value__c,DataManager.Compare_API_Field_Name__c, DataManager.Compare_Value_Is_Blank__c, DataManager.New_Value_Is_Blank__c, DataManager.Email_Notification__c, DataManager.Email_Recipient__c);
                     LastCount += IDsToProcess.get(BatchKey).Size();
                 }            
             }
@@ -187,7 +187,7 @@ public without sharing class DataManagerClass {
 
      
     @future 
-    private static void InsertRecords(String APIObjectName, String APIFieldName, String APIFieldValue, Boolean Iterator, Integer RecordCount, Integer LastCount)
+    private static void InsertRecords(String APIObjectName, String APIFieldName, String APIFieldValue, Boolean Iterator, Integer RecordCount, Integer LastCount, Boolean Notify, String RecipientEamil)
     {
         List<SObject> objects = new List<SObject>();
         List<ID> ParentIDs = new List<ID>();
@@ -232,10 +232,46 @@ public without sharing class DataManagerClass {
         } catch (Exception e) {
             System.debug('Error Insert Records ' + e.getMessage());
         }
+
+        // email notification section
+        // Email notification
+        if (Notify) {
+            try{
+
+                Messaging.reserveSingleEmailCapacity(1);
+
+                Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
+
+                String[] toAddresses = new String[] {RecipientEamil}; 
+
+                mail.setToAddresses(toAddresses);
+
+                mail.setReplyTo('DataManagerNoReply@MarcusMillichap.com');
+
+ 
+                mail.setSenderDisplayName('Data Manager');
+
+                mail.setSubject('Data Manager Batch Report');
+
+                // Set to True if you want to BCC yourself on the email.
+                mail.setBccSender(false);
+
+                mail.setUseSignature(false);
+
+                // Specify the text content of the email.
+                mail.setPlainTextBody(RecordCount + ' record(s) were inserted for object ' + APIObjectName);
+
+                // Send the email you have created.
+                Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
+
+            } catch (Exception e) {
+                system.debug('Send email fail: ' + e.getMessage());
+            }
+        }
     }
 
     @future 
-    private static void UpdateRecords(String APIObjectName, String APIFieldName, String APIFieldValue, List<ID> IDsToProcess, boolean Iterator,Integer RecordCount, Integer LastCount, String Compare_Value, String Compare_API_Field_Name, Boolean Value_Is_Blank, Boolean New_Value_Is_Blank)
+    private static void UpdateRecords(String APIObjectName, String APIFieldName, String APIFieldValue, List<ID> IDsToProcess, boolean Iterator,Integer RecordCount, Integer LastCount, String Compare_Value, String Compare_API_Field_Name, Boolean Value_Is_Blank, Boolean New_Value_Is_Blank, Boolean Notify, String RecipientEamil)
     {
         Boolean CanUpdate = true;
         List<ID> ParentIDs = new List<ID>();
@@ -277,6 +313,39 @@ public without sharing class DataManagerClass {
             Update objects;
         } catch (Exception e) {
             system.debug('Update Objects - UpdateRecords: ' + e.getMessage());
+        }
+
+        // Email notification
+        if (Notify) {
+            try{
+                Messaging.reserveSingleEmailCapacity(1);
+
+                Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
+
+                String[] toAddresses = new String[] {RecipientEamil}; 
+
+                mail.setToAddresses(toAddresses);
+
+                mail.setReplyTo('DataManagerNoReply@MarcusMillichap.com');
+
+                mail.setSenderDisplayName('Data Manager');
+
+                mail.setSubject('Data Manager Batch Report');
+
+                // Set to True if you want to BCC yourself on the email.
+                mail.setBccSender(false);
+
+                mail.setUseSignature(false);
+
+                // Specify the text content of the email.
+                mail.setPlainTextBody(RecordCount + ' record(s) were updated for object ' + APIObjectName);
+
+                // Send the email you have created.
+                Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
+
+            } catch (Exception e) {
+                system.debug('Send email fail: ' + e.getMessage());
+            }
         }
     }
 }

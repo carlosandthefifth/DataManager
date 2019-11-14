@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>Has_Criteria__c</fullName>
+    <fullName>Use_Criteria__c</fullName>
     <defaultValue>false</defaultValue>
+    <description>Set if updates are based on a criteria.</description>
     <externalId>false</externalId>
     <fieldManageability>DeveloperControlled</fieldManageability>
-    <label>Has Criteria</label>
+    <inlineHelpText>Set if updates are based on a criteria</inlineHelpText>
+    <label>Use Criteria</label>
     <type>Checkbox</type>
 </CustomField>

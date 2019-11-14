@@ -3,7 +3,7 @@
     <fullName>Compare_API_Field_Name</fullName>
     <active>true</active>
     <description>If using criteria, the comparative field api name cannot be blank</description>
-    <errorConditionFormula>IF( Has_Criteria__c == TRUE ,  ISBLANK( Compare_API_Field_Name__c ) , false)</errorConditionFormula>
+    <errorConditionFormula>IF( Use_Criteria__c == TRUE ,  ISBLANK( Compare_API_Field_Name__c ) , false)</errorConditionFormula>
     <errorDisplayField>Compare_API_Field_Name__c</errorDisplayField>
     <errorMessage>Comparative API Field name cannot be blank when Use Criteria is checked</errorMessage>
 </ValidationRule>
