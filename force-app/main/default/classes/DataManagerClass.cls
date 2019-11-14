@@ -70,113 +70,117 @@ public without sharing class DataManagerClass {
 
         if (ProjectName == '') {
             // Running all available projects
-            query = 'SELECT Verb__c, Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Has_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c FROM Data_Manager__mdt WHERE Active__c = true LIMIT ' + DMLPerTransaction_LIMIT;
+            query = 'SELECT Verb__c, Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Has_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c, Use_SOQL__c FROM Data_Manager__mdt WHERE Active__c = true LIMIT ' + DMLPerTransaction_LIMIT;
         }
         else {
             // Select a specific project to run
-            query = 'SELECT Verb__c, Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Has_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c FROM Data_Manager__mdt WHERE Active__c = true  AND Label =:ProjectName LIMIT ' + DMLPerTransaction_LIMIT;
+            query = 'SELECT Verb__c, Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Has_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c FROM Data_Manager__mdt, Use_SOQL__C WHERE Active__c = true  AND Label =:ProjectName LIMIT ' + DMLPerTransaction_LIMIT;
         }
-        DataManagerList = database.query(query);
-        
-        for (Data_Manager__mdt DataManager : DataManagerList) {
-            // Build query for total records
-            Parameters.add(DataManager.Object_API_Name__c);
-            if(DataManager.Verb__c == 'Update') {
-                if((DataManager.Has_Criteria__c) && !(DataManager.Use_SOQL__c)) {
-                    query = 'SELECT ID FROM {0} WHERE {1} {2} {3} LIMIT {4}';
-                    // Get the operator
-                    if (DataManager.Comparative_Operator__c == 'Equal')
-                        ComparativeOperator = '=';
-                    if (DataManager.Comparative_Operator__c == 'Less Than')
-                        ComparativeOperator = '<';
-                    if (DataManager.Comparative_Operator__c == 'Less Than Equal To')
-                        ComparativeOperator = '<=';
-                    if (DataManager.Comparative_Operator__c == 'Greater Than')
-                        ComparativeOperator = '>';
-                    if (DataManager.Comparative_Operator__c == 'Greater Than Equal To')
-                        ComparativeOperator = '>=';
-                    if (DataManager.Comparative_Operator__c == 'Not Equal')
-                        ComparativeOperator = '!=';
+        try {
+            DataManagerList = database.query(query);
+            
+            for (Data_Manager__mdt DataManager : DataManagerList) {
+                // Build query for total records
+                Parameters.add(DataManager.Object_API_Name__c);
+                if(DataManager.Verb__c == 'Update') {
+                    if((DataManager.Has_Criteria__c) && !(DataManager.Use_SOQL__c)) {
+                        query = 'SELECT ID FROM {0} WHERE {1} {2} {3} LIMIT {4}';
+                        // Get the operator
+                        if (DataManager.Comparative_Operator__c == 'Equal')
+                            ComparativeOperator = '=';
+                        if (DataManager.Comparative_Operator__c == 'Less Than')
+                            ComparativeOperator = '<';
+                        if (DataManager.Comparative_Operator__c == 'Less Than Equal To')
+                            ComparativeOperator = '<=';
+                        if (DataManager.Comparative_Operator__c == 'Greater Than')
+                            ComparativeOperator = '>';
+                        if (DataManager.Comparative_Operator__c == 'Greater Than Equal To')
+                            ComparativeOperator = '>=';
+                        if (DataManager.Comparative_Operator__c == 'Not Equal')
+                            ComparativeOperator = '!=';
+                        
+                        Parameters.add(DataManager.Compare_API_Field_Name__c);
+                        Parameters.add(ComparativeOperator);    
+                        if (DataManager.Value_Is_Blank__c)
+                            Parameters.add(' \' \' ');
+                        else
+                            Parameters.add(DataManager.Compare_Value__c);
+                    }  else {
+                        if (DataManager.Use_SOQL__c)
+                            query = DataManager.query__c;
+                        else 
+                            query = 'SELECT ID FROM {0} LIMIT {1}';
+                    }
+
+                    if (!DataManager.Use_SOQL__c) {
+                        Parameters.add(string.valueOf(RowsPerTransaction_LIMIT - LIMITS.getQueryRows()));
+
+                        query = string.format(query,Parameters);
+                    }
+
+                    system.debug('query: ' + query);
+
+                    try {
+                        objects = database.query(query);
+                    } catch (Exception e) {
+                        system.debug('on update query error: ' + e.getMessage());
+                    }
+
+                    TotalRecords = objects.size();
+                    system.debug('-- TotalRecords: ' + TotalRecords);
+                    BatchIndex = 0;
+                    for (SObject obj : objects) {
+                        BatchIds.add(obj.id);
+                        RecordIndex++;
+                    if (RecordIndex > DMLPerTransaction_LIMIT - 1) {
+                            RecordIndex = 0;
+                            IDsToProcess.put(BatchIndex, BatchIds);
+                            BatchIndex++;
+                            BatchIds = New List<Id>();
+                        }
+                        
+                    }
                     
-                    Parameters.add(DataManager.Compare_API_Field_Name__c);
-                    Parameters.add(ComparativeOperator);    
-                    if (DataManager.Value_Is_Blank__c)
-                        Parameters.add(' \' \' ');
-                    else
-                        Parameters.add(DataManager.Compare_Value__c);
-                }  else {
-                    if (DataManager.Use_SOQL__c)
-                        query = DataManager.query__c;
-                    else 
-                        query = 'SELECT ID FROM {0} LIMIT {1}';
-                }
+                    if (BatchIds.size() > 0 ) {
+                        IDsToProcess.put(BatchIndex,BatchIds);
+                    }
 
-                if (!DataManager.Use_SOQL__c) {
-                    Parameters.add(string.valueOf(RowsPerTransaction_LIMIT - LIMITS.getQueryRows()));
+                } else { 
+                    TotalRecords = (Integer)DataManager.Record_Count__c;
 
-                    query = string.format(query,Parameters);
-                }
-
-                system.debug('query: ' + query);
-
-                try {
-                    objects = database.query(query);
-                } catch (Exception e) {
-                    system.debug('on update query error: ' + e.getMessage());
-                }
-
-                TotalRecords = objects.size();
-                system.debug('-- TotalRecords: ' + TotalRecords);
-                BatchIndex = 0;
-                for (SObject obj : objects) {
-                    BatchIds.add(obj.id);
-                    RecordIndex++;
-                if (RecordIndex > DMLPerTransaction_LIMIT - 1) {
-                        RecordIndex = 0;
-                        IDsToProcess.put(BatchIndex, BatchIds);
+                    // Break records up into DML Batches
+                    BatchIndex = 0;
+                    while (TotalRecords >= DMLPerTransaction_LIMIT) {
+                        if (TotalRecords > DMLPerTransaction_LIMIT) {
+                            RecordsToInsert.put(BatchIndex, DMLPerTransaction_LIMIT);
+                        }
+                        else {
+                            RecordsToInsert.put(BatchIndex, TotalRecords);
+                        }
+                        TotalRecords -= DMLPerTransaction_LIMIT;
                         BatchIndex++;
-                        BatchIds = New List<Id>();
                     }
+                    if (TotalRecords > 0) RecordsToInsert.put(BatchIndex, TotalRecords);
                     
                 }
-                
-                if (BatchIds.size() > 0 ) {
-                    IDsToProcess.put(BatchIndex,BatchIds);
+
+                system.debug('TotalRecords: ' + TotalRecords);
+
+                LastCount = 0;
+                for(Integer BatchKey : RecordsToInsert.keySet()) {
+                        InsertRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, DataManager.Add_Suffix_Iterator__c,RecordsToInsert.get(BatchKey) , LastCount);
+                        LastCount += RecordsToInsert.get(BatchKey);
+                        if (LIMITS.getFutureCalls() + 1 > FuturePerTransaction_LIMIT) break; // we have reached the maximum number of future calls
                 }
 
-            } else { 
-                TotalRecords = (Integer)DataManager.Record_Count__c;
-
-                // Break records up into DML Batches
-                BatchIndex = 0;
-                while (TotalRecords >= DMLPerTransaction_LIMIT) {
-                    if (TotalRecords > DMLPerTransaction_LIMIT) {
-                        RecordsToInsert.put(BatchIndex, DMLPerTransaction_LIMIT);
-                    }
-                    else {
-                        RecordsToInsert.put(BatchIndex, TotalRecords);
-                    }
-                    TotalRecords -= DMLPerTransaction_LIMIT;
-                    BatchIndex++;
-                }
-                if (TotalRecords > 0) RecordsToInsert.put(BatchIndex, TotalRecords);
-                
+                for (Integer BatchKey : IDsToProcess.keySet()) {
+                    system.debug('IDsToProcess.get(' + BatchKey + ').size(): ' + IDsToProcess.get(BatchKey).size());
+                    UpdateRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, IDsToProcess.get(BatchKey), DataManager.Add_Suffix_Iterator__c,IDsToProcess.get(BatchKey).Size(), LastCount, DataManager.Compare_Value__c,DataManager.Compare_API_Field_Name__c, DataManager.Value_Is_Blank__c, DataManager.New_Value_Is_Blank__c);
+                    LastCount += IDsToProcess.get(BatchKey).Size();
+                }            
             }
-
-            system.debug('TotalRecords: ' + TotalRecords);
-
-            LastCount = 0;
-            for(Integer BatchKey : RecordsToInsert.keySet()) {
-                    InsertRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, DataManager.Add_Suffix_Iterator__c,RecordsToInsert.get(BatchKey) , LastCount);
-                    LastCount += RecordsToInsert.get(BatchKey);
-                    if (LIMITS.getFutureCalls() + 1 > FuturePerTransaction_LIMIT) break; // we have reached the maximum number of future calls
-            }
-
-            for (Integer BatchKey : IDsToProcess.keySet()) {
-                system.debug('IDsToProcess.get(' + BatchKey + ').size(): ' + IDsToProcess.get(BatchKey).size());
-                UpdateRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, IDsToProcess.get(BatchKey), DataManager.Add_Suffix_Iterator__c,IDsToProcess.get(BatchKey).Size(), LastCount, DataManager.Compare_Value__c,DataManager.Compare_API_Field_Name__c, DataManager.Value_Is_Blank__c, DataManager.New_Value_Is_Blank__c);
-                LastCount += IDsToProcess.get(BatchKey).Size();
-            }            
+        } catch (Exception e) {
+            system.debug('initial setup: ' + e.getMessage());
         }
     }
 
@@ -191,32 +195,35 @@ public without sharing class DataManagerClass {
         String query = '';
 
         // Do we have parent records
-        if (APIFieldValue.indexOf('@')==0) {
-            ParentObject = APIFieldValue.Replace('@','');
-            query = 'SELECT ID FROM ' + ParentObject + ' LIMIT ' + DMLPerTransaction_LIMIT;
-            objects = database.query(query);
-            for (SObject obj : objects) {
-                ParentIDs.Add(obj.id);
-            }            
-            objects = new List<SObject>();
+        if (APIFieldValue != null) {
+            if (APIFieldValue.indexOf('@')==0) {
+                ParentObject = APIFieldValue.Replace('@','');
+                query = 'SELECT ID FROM ' + ParentObject + ' LIMIT ' + DMLPerTransaction_LIMIT;
+                objects = database.query(query);
+                for (SObject obj : objects) {
+                    ParentIDs.Add(obj.id);
+                }            
+                objects = new List<SObject>();
+            }
         }
-        
         try {
             for (Integer i = 0; i < RecordCount; i ++) {
                 SObject obj =  (SObject)Type.forName(APIObjectName).newInstance();
-                if (ParentObject == '') {
-                    // No parent record
-                    if (Iterator) {
-                        obj.put(APIFieldName, APIFieldValue + (i + LastCount));
+                if (APIFieldName != null) {
+                    if (ParentObject == '') {
+                        // No parent record
+                        if (Iterator) {
+                            obj.put(APIFieldName, APIFieldValue + (i + LastCount));
+                        }
+                        else {
+                            obj.put(APIFieldName, APIFieldValue);
+                        }
+                    } else {
+                        // Parent record
+                        obj.put(APIFieldName, ParentIds[ParentRecordCount]);
+                        ParentRecordCount++;
+                        if (ParentRecordCount >= ParentIDs.Size()) ParentRecordCount = 0;
                     }
-                    else {
-                        obj.put(APIFieldName, APIFieldValue);
-                    }
-                } else {
-                    // Parent record
-                    obj.put(APIFieldName, ParentIds[ParentRecordCount]);
-                    ParentRecordCount++;
-                    if (ParentRecordCount >= ParentIDs.Size()) ParentRecordCount = 0;
                 }
                 objects.add(obj);
             }
