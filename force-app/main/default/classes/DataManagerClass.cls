@@ -19,7 +19,6 @@
 */
 public without sharing class DataManagerClass {
 
-    
     public class DataManagerClassException extends Exception {}
 
     public static boolean ThrowException_CodeCoverage = false;
@@ -32,23 +31,17 @@ public without sharing class DataManagerClass {
     public static integer  EmailPerTransaction_LIMIT       = Limits.getLimitEmailInvocations(); // getEmailInvocations()
     public static integer  DMLPerTransaction_LIMIT         = Limits.getLimitDmlRows(); // getDMLStatements()
     public static integer  RowsPerTransaction_LIMIT        = Limits.getLimitQueryRows(); // getQueryRows()
+    
     private static integer DATA_BATCH_SIZE                 = DMLPerTransaction_LIMIT;
 
     // Primary variables
-    public static List<Data_Manager_Project__mdt>  projects = new List<Data_Manager_Project__mdt>();
-    public static List<SObject> Objects = new List<SObject>();
-    public static Set<ID> IDsAlreadyMarkedForProcessing = new Set<ID>();
-    public static Set<ID> IDsToProcess = new Set<ID>();
-    public static String query;
-    public static integer TotalNumberOfRecords = 0;
-    public static boolean SomethingToUpdate = true;
-    private static integer TotalFutureCallsNeeded = 0;
-    private static integer TotalFutureCallsExecuted = 0;
+    private static List<Data_Manager__mdt> DataManagerList = new List<Data_Manager__mdt>();
+    private static Map<Integer, List<ID>> IDsToProcess = new Map<Integer, List<ID>>();
+    private static Map<Integer,Integer> RecordsToInsert = new Map<Integer,Integer>();
+    private static List<ID> IDsMarked = new List<ID>();
+    private static List<SObject> objects = new List<SObject>();
+    private static List<String> Parameters = new List<String>();
 
-    private static Map<Id,Data_Manager_Object__mdt> APIObjectNamesMap;
-    private static Set<ID> CustomMetaObjectsIDs = new Set<ID>();
-    private static List<String> APINames = new List<String>();
- 
     public DataManagerClass() {
         // Set limit values
         QueriesPerTransaction_LIMIT     = Limits.getLimitQueryRows(); // getQueryRows() 
@@ -65,313 +58,206 @@ public without sharing class DataManagerClass {
 
     public static void execute (String ProjectName) 
     { 
+        String ComparativeOperator = '';
+        String query               = '';
+        Integer TotalRecords       = 0;
+        Integer BatchIndex         = 0;
+        Integer RecordIndex        = 0; 
+        List<ID> BatchIds          = new List<ID>();
+        Integer LastCount          = 0;
 
-        string query;
-        Set<ID>ProjectIDs = new Set<ID>();
-        Integer TotalRecords = 0;
-        // List of active projects 
-        if (ProjectName == '') 
-            query = 'SELECT ID, Priority__c FROM Data_Manager_Project__mdt WHERE Active__c = true ORDER BY Priority__c ASC LIMIT ' + RowsPerTransaction_LIMIT ;
-        else
-            query = 'SELECT ID, Priority__c FROM Data_Manager_Project__mdt WHERE Active__c = true AND Label = :ProjectName ORDER BY Priority__c ASC LIMIT ' + RowsPerTransaction_LIMIT ;
-        system.debug('query: ' + query);
-        projects = Database.query(query);
-        system.debug('projects.size(): ' + projects.size());
-        for (Data_Manager_Project__mdt project : projects) {
-            system.debug('project.id: ' + project.id);
-            system.debug('project.Priority__c: ' + project.Priority__c);
+        system.debug('inside execute');
+
+        if (ProjectName == '') {
+            // Running all available projects
+            query = 'SELECT Verb__c, Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Has_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c FROM Data_Manager__mdt WHERE Active__c = true LIMIT ' + DMLPerTransaction_LIMIT;
         }
-
-        // Aggregate all ids for active projects
-        for (Data_Manager_Project__mdt project : projects) {
-            ProjectIds.add(project.id);
+        else {
+            // Select a specific project to run
+            query = 'SELECT Verb__c, Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Has_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c FROM Data_Manager__mdt WHERE Active__c = true  AND Label =:ProjectName LIMIT ' + DMLPerTransaction_LIMIT;
         }
-
-        system.debug('projects.size(): ' + projects.size());
-        // List of Object API Names 
-        query = 'SELECT ID, Object_API_Name__c, Record_Count__c, Verb__c, Data_Manager_ProjectId__c FROM Data_Manager_Object__mdt WHERE Data_Manager_ProjectId__c IN :ProjectIds LIMIT ' + RowsPerTransaction_LIMIT;
-
-        system.debug('query: ' + query);
-        APIObjectNamesMap   = new Map<Id,Data_Manager_Object__mdt>((List<Data_Manager_Object__mdt>)database.query(query));  
-        for (ID key : APIObjectNamesMap.keyset()) {
-            system.debug('APIObjectNamesMap.get(Key).Data_Manager_ProjectId__c: ' + APIObjectNamesMap.get(Key).Data_Manager_ProjectId__c);
-            system.debug('APIObjectNamesMap.get(Key).Object_API_Name__c: ' + APIObjectNamesMap.get(Key).Object_API_Name__c);
-
-            //Grab a batch of IDs
-            if (APIObjectNamesMap.get(key).verb__c != 'Insert') {
-                if (IDsAlreadyMarkedForProcessing.size() < 1) {
-                    // final form looks like SELECT ID FROM Account LIMIT 10000 with account and LIMIT number changable
-                    query = 'SELECT ID FROM ' + APIObjectNamesMap.get(Key).Object_API_Name__c  + ' LIMIT ' + DMLPerTransaction_LIMIT;
+        DataManagerList = database.query(query);
+        
+        for (Data_Manager__mdt DataManager : DataManagerList) {
+            // Build query for total records
+            Parameters.add(DataManager.Object_API_Name__c);
+            if(DataManager.Verb__c == 'Update') {
+                if(DataManager.Has_Criteria__c) {
+                    query = 'SELECT ID FROM {0} WHERE {1} {2} {3} LIMIT {4}';
+                    // Get the operator
+                    if (DataManager.Comparative_Operator__c == 'Equal')
+                        ComparativeOperator = '=';
+                    if (DataManager.Comparative_Operator__c == 'Less Than')
+                        ComparativeOperator = '<';
+                    if (DataManager.Comparative_Operator__c == 'Less Than Equal To')
+                        ComparativeOperator = '<=';
+                    if (DataManager.Comparative_Operator__c == 'Greater Than')
+                        ComparativeOperator = '>';
+                    if (DataManager.Comparative_Operator__c == 'Greater Than Equal To')
+                        ComparativeOperator = '>=';
+                    if (DataManager.Comparative_Operator__c == 'Not Equal')
+                        ComparativeOperator = '!=';
+                    
+                    Parameters.add(DataManager.Compare_API_Field_Name__c);
+                    Parameters.add(ComparativeOperator);    
+                    if (DataManager.Value_Is_Blank__c)
+                        Parameters.add(' \' \' ');
+                    else
+                        Parameters.add(DataManager.Compare_Value__c);
+                }  else {
+                    query = 'SELECT ID FROM {0} LIMIT {1}';
                 }
-                else {
-                    query = 'SELECT ID  FROM ' + APIObjectNamesMap.get(Key).Object_API_Name__c + ' WHERE ID NOT IN :IDsAlreadyMarkedForProcessing LIMIT ' + DMLPerTransaction_LIMIT;
+
+                Parameters.add(string.valueOf(RowsPerTransaction_LIMIT - LIMITS.getQueryRows()));
+
+                query = string.format(query,Parameters);
+                
+                system.debug('query: ' + query);
+                objects = database.query(query);
+
+                TotalRecords = objects.size();
+                system.debug('-- TotalRecords: ' + TotalRecords);
+                BatchIndex = 0;
+                for (SObject obj : objects) {
+                    BatchIds.add(obj.id);
+                    RecordIndex++;
+                if (RecordIndex > DMLPerTransaction_LIMIT - 1) {
+                        RecordIndex = 0;
+                        IDsToProcess.put(BatchIndex, BatchIds);
+                        BatchIndex++;
+                        BatchIds = New List<Id>();
+                    }
+                    
                 }
+                
+                if (BatchIds.size() > 0 ) {
+                    IDsToProcess.put(BatchIndex,BatchIds);
+                }
+
+            } else { 
+                TotalRecords = (Integer)DataManager.Record_Count__c;
+
+                // Break records up into DML Batches
+                BatchIndex = 0;
+                while (TotalRecords >= DMLPerTransaction_LIMIT) {
+                    if (TotalRecords > DMLPerTransaction_LIMIT) {
+                        RecordsToInsert.put(BatchIndex, DMLPerTransaction_LIMIT);
+                    }
+                    else {
+                        RecordsToInsert.put(BatchIndex, TotalRecords);
+                    }
+                    TotalRecords -= DMLPerTransaction_LIMIT;
+                    BatchIndex++;
+                }
+                if (TotalRecords > 0) RecordsToInsert.put(BatchIndex, TotalRecords);
+                
             }
 
-            system.debug('query: ' + query);
-            Objects = database.query(query);
-            system.debug('APIObjectNamesMap.get(Key).Verb__c: ' + APIObjectNamesMap.get(Key).Verb__c);
-            if  (APIObjectNamesMap.get(Key).Verb__c == 'Update' || APIObjectNamesMap.get(Key).Verb__c == 'Upsert') {
-                IDsToProcess.clear();
-                system.debug('objects.size(): ' + objects.size());
-                for(SObject obj : Objects) {
-                    system.debug('adding ....');
-                    IDsToProcess.add(obj.id);
-                }
-
-                TotalRecords = IDsToProcess.size();
-            } else {
-                TotalRecords = (Integer)APIObjectNamesMap.get(key).Record_Count__c;
-            }
-            system.debug('APIObjectNamesMap.get(Key).Object_API_Name__c: ' + APIObjectNamesMap.get(Key).Object_API_Name__c);
-            system.debug('key: ' + key);
-
-            system.debug('TotalFutureCallsNeeded: ' + TotalFutureCallsNeeded);
             system.debug('TotalRecords: ' + TotalRecords);
-            system.debug('DMLPerTransaction_LIMIT: ' + DMLPerTransaction_LIMIT);
-            // How many future calls will we need
-            TotalFutureCallsNeeded = (TotalRecords/DMLPerTransaction_LIMIT);
 
-            // Ensure we are making at least one future call
-            TotalFutureCallsNeeded = ((DMLPerTransaction_LIMIT - TotalNumberOfRecords) > 0 ) ? TotalFutureCallsNeeded = TotalFutureCallsNeeded + 1 : TotalFutureCallsNeeded;
-        
-            // Make sure we are within future call limits
-            TotalFutureCallsNeeded = (TotalFutureCallsNeeded > FuturePerTransaction_LIMIT) ? FuturePerTransaction_LIMIT : TotalFutureCallsNeeded;
-
-            system.debug('TotalFutureCallsNeeded: ' + TotalFutureCallsNeeded);
-
-            TotalFutureCallsExecuted = 0;
-            while (TotalFutureCallsExecuted < TotalFutureCallsNeeded) {
-                if (APIObjectNamesMap.get(Key).Verb__c == 'Update' || APIObjectNamesMap.get(Key).Verb__c == 'Upsert') {
-                    ProcessRecords(key,APIObjectNamesMap.get(Key).Object_API_Name__c,IDsToProcess,APIObjectNamesMap.get(Key).Verb__c,0);
-                } else {
-                    ProcessRecords(key,APIObjectNamesMap.get(Key).Object_API_Name__c,IDsToProcess,APIObjectNamesMap.get(Key).Verb__c,(Integer)APIObjectNamesMap.get(key).Record_Count__c);
-                }
-                TotalFutureCallsExecuted++; // count it!
+            LastCount = 0;
+            for(Integer BatchKey : RecordsToInsert.keySet()) {
+                    InsertRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, DataManager.Add_Suffix_Iterator__c,RecordsToInsert.get(BatchKey) , LastCount);
+                    LastCount += RecordsToInsert.get(BatchKey);
+                    if (LIMITS.getFutureCalls() + 1 > FuturePerTransaction_LIMIT) break; // we have reached the maximum number of future calls
             }
 
-            for(SObject obj : Objects)  {
-                IDsAlreadyMarkedForProcessing.add(obj.id);
-            }
-        }
-    }
-
-    private static Map<Id, Data_Manager_Object__mdt> getObjectApiNames() 
-    {
-        Map<Id,Data_Manager_Object__mdt> APINames;
-        try {
-                APINames = 
-                    new Map<Id,Data_Manager_Object__mdt>([SELECT Id, Object_API_Name__c FROM Data_Manager_Object__mdt]);
-
-                if (APINames == null) throw new DataManagerClassException('getObjectApiNames APINames is NULL'); 
-            
-            return APINames;
-        
-        } catch (Exception e) {
-            // error logging
-            system.debug('getObjectApiNames: ' + e.getMessage());
-            return APINames;
-        }
-    }
-
-    private static integer NumberOfRecords (String ObjectAPIName) {
-        String query;
-        Integer result;
-        try {
-            query = 'SELECT count() FROM ' + objectAPIName;
-            result = Database.countQuery(query);
-
-            return result;
-
-        } catch (Exception e) {
-            // error logging
-            system.debug('NumberOfRecords: ' + e.getMessage());
-            return -1;
+            for (Integer BatchKey : IDsToProcess.keySet()) {
+                system.debug('IDsToProcess.get(' + BatchKey + ').size(): ' + IDsToProcess.get(BatchKey).size());
+                UpdateRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, IDsToProcess.get(BatchKey), DataManager.Add_Suffix_Iterator__c,IDsToProcess.get(BatchKey).Size(), LastCount, DataManager.Compare_Value__c,DataManager.Compare_API_Field_Name__c, DataManager.Value_Is_Blank__c, DataManager.New_Value_Is_Blank__c);
+                LastCount += IDsToProcess.get(BatchKey).Size();
+            }            
         }
     }
 
      
+    @future 
+    private static void InsertRecords(String APIObjectName, String APIFieldName, String APIFieldValue, Boolean Iterator, Integer RecordCount, Integer LastCount)
+    {
+        List<SObject> objects = new List<SObject>();
+        List<ID> ParentIDs = new List<ID>();
+        Integer ParentRecordCount = 0;
+        String ParentObject = '';
+        String query = '';
+
+        // Do we have parent records
+        if (APIFieldValue.indexOf('@')==0) {
+            ParentObject = APIFieldValue.Replace('@','');
+            query = 'SELECT ID FROM ' + ParentObject + ' LIMIT ' + DMLPerTransaction_LIMIT;
+            objects = database.query(query);
+            for (SObject obj : objects) {
+                ParentIDs.Add(obj.id);
+            }            
+            objects = new List<SObject>();
+        }
+        
+        try {
+            for (Integer i = 0; i < RecordCount; i ++) {
+                SObject obj =  (SObject)Type.forName(APIObjectName).newInstance();
+                if (ParentObject == '') {
+                    // No parent record
+                    if (Iterator) {
+                        obj.put(APIFieldName, APIFieldValue + (i + LastCount));
+                    }
+                    else {
+                        obj.put(APIFieldName, APIFieldValue);
+                    }
+                } else {
+                    // Parent record
+                    obj.put(APIFieldName, ParentIds[ParentRecordCount]);
+                    ParentRecordCount++;
+                    if (ParentRecordCount >= ParentIDs.Size()) ParentRecordCount = 0;
+                }
+                objects.add(obj);
+            }
+            insert objects;
+        } catch (Exception e) {
+            System.debug('Error Insert Records ' + e.getMessage());
+        }
+    }
 
     @future 
-    private static void ProcessRecords(ID CustomMetaDataRecord, String APIName, Set<ID> IDsToProcess, String verb, Integer RecordCount)
+    private static void UpdateRecords(String APIObjectName, String APIFieldName, String APIFieldValue, List<ID> IDsToProcess, boolean Iterator,Integer RecordCount, Integer LastCount, String Compare_Value, String Compare_API_Field_Name, Boolean Value_Is_Blank, Boolean New_Value_Is_Blank)
     {
-        String query;
-        String MessageString;
-        List<SObject> objects;
-        List<Id> RelatedToIDs = new List<Id>();
-        Set<Id> Ids = new Set<Id>();
-      
-        system.debug('CustomMetaDataRecord: ' + CustomMetaDataRecord);
-        system.debug('APIName: ' + APIName);
-        system.debug('IDsToProcess: ' + IDsToProcess);
+        List<ID> ParentIDs = new List<ID>();
+        Integer ParentRecordCount = 0;
+        String ParentObject = '';
+        String query = '';
 
-        // Get related fields
-        query = 'SELECT API_Field_Name__c, Comparative_Operator__c, Compare_Value__c, Compare_API_Field_Name__c, Data_Manager_ObjectId__c, Evaluate_Next_Criteria__c, Has_Criteria__c, Logical_Operator__c, New_Value__c, Suffix_Iterator__c, Value_Is_Blank__c FROM Data_Manager_Field__mdt WHERE Data_Manager_ObjectId__c = \''+ CustomMetaDataRecord + '\'';
-        system.debug('query: ' + query);
-
-        List<Data_Manager_Field__mdt> fields = database.Query(query);
-
-        if (verb == 'Update' || verb == 'Upsert') {
-            system.debug('updating or upserting...');
-            try {
-                if (fields.size() <= 0)  throw new DataManagerClassException('fields size is zero');
-                system.debug('fields: ' + fields);
-
-                //build query 
-                query = 'SELECT ';
-
-                List<String> ComparitiveAPIValues = new List<String>();
-                for (Data_Manager_Field__mdt field : fields) {
-                    query = query + field.Compare_API_Field_Name__c + ', ';
-                    ComparitiveAPIValues.add(field.Compare_API_Field_Name__c);
-                }
-
-                for (Data_Manager_Field__mdt field : fields) {
-                    if (!ComparitiveAPIValues.contains(field.API_Field_Name__c))
-                        query = query + field.API_Field_Name__c + ', ';
-                }
-                system.debug('1 query: ' + query);
-                query = query.removeEnd(', ');
-                system.debug('2 query: ' + query);
-
-                query = query + ' FROM ' + APIName + ' WHERE ID IN: IDsToProcess LIMIT ' + DMLPerTransaction_LIMIT;
-
-                system.debug('3 query: ' + query);
-
-                objects = Database.query(query);
-                if (objects.size() <= 0)  throw new DataManagerClassException('objects size is zero');
-                
-                for (SObject obj : objects) {
-                    Boolean CanUpdate = true;
-                    system.debug('obj: ' + obj);
-                    for (Data_Manager_Field__mdt field : fields) {
-                        if (field.Has_Criteria__c) {
-                            if (field.Comparative_Operator__c == 'Equal') {
-                                if (field.Value_Is_Blank__c) {
-                                    CanUpdate = (obj.get(field.Compare_API_Field_Name__c) ==  '');
-                                }
-                                else {
-                                    CanUpdate = (obj.get(field.Compare_API_Field_Name__c) == field.Compare_Value__c);        
-                                }
-                                    
-                            }
-                        }
-                        if (CanUpdate)
-                            obj.put(field.API_Field_Name__c,field.New_Value__c);
-                    }
-                }
-                update objects;
-                MessageString = 'Successful batch for ' + APIName + ' ' + verb;
-            } catch (Exception e) {
-                system.debug('ProcessRecords - update/upsert: ' + e.getMessage());
-                MessageString = 'Error batch for ' + APIName + ' ' + verb;
-            }
-        } else {
-            // Insert
-            system.debug('inserting...');
-            try {
-                String StrOps;
-
-                query = 'SELECT API_Field_Name__c, Comparative_Operator__c, Compare_API_Field_Name__c, Compare_Value__c, Data_Manager_ObjectId__c, Evaluate_Next_Criteria__c, Has_Criteria__c, Logical_Operator__c, New_Value__c, Suffix_Iterator__c, Value_Is_Blank__c FROM Data_Manager_Field__mdt WHERE Data_Manager_ObjectId__c = \''+ CustomMetaDataRecord + '\'';
-                    
-                fields = database.Query(query);
-                
-                if (fields.size() <= 0)  throw new DataManagerClassException('fields size is zero');
-
-                system.debug('fields: ' + fields);
-                for (Data_Manager_Field__mdt field : fields) {
-                    StrOps = (String)field.New_Value__c;
-                    System.debug('StrOps.indexOf(@): ' + StrOps.indexOf('@'));
-                    if (StrOps.indexOf('@')==0) {
-                        Ids.clear();
-                        StrOps = StrOps.replace('@','');
-                        query ='SELECT ID FROM ' + StrOps + ' LIMIT ' + DMLPerTransaction_LIMIT;
-                        system.debug('related query: ' + query);
-                        objects = new List<SObject>(database.query(query));
-                        system.debug('objects.size(): ' + objects.size());
-                        system.debug('objects: ' + objects);
-                        for (SObject obj : objects) {
-                            RelatedToIDs.add(obj.id);
-                        }
-                    }
-               }
-
-                objects = new List<SObject>();
-                Integer RelatedtoIDMapIndex = 0;
-                system.debug('RelatedToIDs.size(): ' + RelatedToIDs.size());
-                for (Integer i = 0; i< RecordCount;i++){
-                    SObject obj =  (SObject)Type.forName(APIName).newInstance();
-                    for (Data_Manager_Field__mdt field : fields) {
-                        if ((field.New_Value__c.indexOf('@')==0) && (RelatedToIDs.size() > 0)) {
-                            obj.put(field.API_Field_Name__c,RelatedToIDs.get(RelatedtoIDMapIndex));
-                            system.debug('RelatedToIDs.get('+ RelatedtoIDMapIndex +'): ' + RelatedToIDs.get(RelatedtoIDMapIndex));
-                            RelatedtoIDMapIndex++;
-                            if (RelatedtoIDMapIndex > RelatedToIDs.size() - 1) RelatedtoIDMapIndex = 0;
-                        } else {                       
-                            if (field.New_Value__c.indexOf('@')==0) field.New_Value__c = '';
-                            system.debug('field.Suffix_Iterator__c: ' + field.Suffix_Iterator__c);
-                            if (field.Suffix_Iterator__c) { 
-                                system.debug('iterator true');
-                                obj.put(field.API_Field_Name__c,field.New_Value__c + ' ' + i);
-                            }
-                            else {
-                                system.debug('iterator false');
-                                obj.put(field.API_Field_Name__c,field.New_Value__c);
-                            }
-                        }
-                    }
-                    system.debug('obj: ' + obj);
-                    objects.add(obj);
-                    system.debug('objects: ' + objects);
-
-                }
-                insert objects;
-                MessageString = 'Successful batch for ' + APIName + ' ' + verb;
-
-            } catch (Exception e) {
-                system.debug('ProcessRecords - insert: ' + e.getMessage());
-            }
-
+        system.debug('inside updaterecords');
+        if (APIFieldValue.indexOf('@')==0) {
+            ParentObject = APIFieldValue.Replace('@','');
+            query = 'SELECT ID FROM ' + ParentObject + ' LIMIT ' + DMLPerTransaction_LIMIT;
+            objects = database.query(query);
+            for (SObject obj : objects) {
+                ParentIDs.Add(obj.id);
+            }            
         }
 
-        query = 'SELECT Active__c, Email_Recipient__c FROM Data_Manager_Notification__mdt WHERE Data_Manager_ProjectID__c  =:CustomMetaDataRecord';
+        system.debug('ParentIDs.Size(): ' + ParentIDs.size());
+        query = 'SELECT ID, ' + APIFieldName + ' FROM ' + APIObjectName + ' WHERE ID IN :IDsToProcess LIMIT ' + DMLPerTransaction_LIMIT;
+        system.debug('Update Records query: ' + query);
+        List<SObject> objects = database.query(query);
 
-        List<Data_Manager_Notification__mdt> Notifications = database.query(query);
-
-        // Send notification email if requested
-        // Now create a new single email message object
-        // that will send out a single email to the addresses in the To, CC & BCC list.
-        Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
-
-        List<String> toAddresses = new List<String>();
-        for (Data_Manager_Notification__mdt Notification : Notifications) {
-            // Processes and actions involved in the Apex transaction occur next,
-            // which conclude with sending a single email.
-
-            if (Notification.Active__c) {
-                // Strings to hold the email addresses to which you are sending the email.
-                toAddresses.add(Notification.Email_Recipient__c);
-
-                // First, reserve email capacity for the current Apex transaction to ensure
-                // that we won't exceed our daily email limits when sending email after
-                // the current transaction is committed.
-                Messaging.reserveSingleEmailCapacity(Notifications.size());
-
-                // Assign the addresses for the To and CC lists to the mail object.
-                mail.setToAddresses(toAddresses);
-
-                // Specify the address used when the recipients reply to the email. 
-                mail.setReplyTo('noreply@marcusmillichap.com');
-
-                // Specify the name used as the display name.
-                mail.setSenderDisplayName('Data Manager');
-
-                // Specify the text content of the email.
-                mail.setPlainTextBody(MessageString);
-
-                // Send the email you have created.
-                Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
+        for (SObject obj : objects) {
+            try {
+                if (ParentIds.size() > 0 ){
+                    obj.put(APIFieldName,ParentIDs[ParentRecordCount]);
+                    ParentRecordCount++;
+                    if (ParentRecordCount > ParentIDs.size() - 1)
+                        ParentRecordCount = 0;
+                }
+                else  {
+                    obj.put(APIFieldName,APIFieldValue);
+                }
+            } catch (Exception e) {
+                system.debug('UpdateRecords ' + e.getMessage());
             }
+        }
+        try {
+            Update objects;
+        } catch (Exception e) {
+            system.debug('Update Objects - UpdateRecords: ' + e.getMessage());
         }
     }
 }

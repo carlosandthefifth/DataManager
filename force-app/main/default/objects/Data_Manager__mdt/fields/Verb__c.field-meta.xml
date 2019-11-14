@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>Logical_Operator_For_Next__c</fullName>
+    <fullName>Verb__c</fullName>
     <externalId>false</externalId>
     <fieldManageability>DeveloperControlled</fieldManageability>
-    <label>Logical Operator For Next</label>
+    <label>Verb</label>
     <required>false</required>
     <type>Picklist</type>
     <valueSet>
@@ -11,19 +11,14 @@
         <valueSetDefinition>
             <sorted>false</sorted>
             <value>
-                <fullName>AND</fullName>
-                <default>true</default>
-                <label>AND</label>
+                <fullName>Insert</fullName>
+                <default>false</default>
+                <label>Insert</label>
             </value>
             <value>
-                <fullName>OR</fullName>
+                <fullName>Update</fullName>
                 <default>false</default>
-                <label>OR</label>
-            </value>
-            <value>
-                <fullName>NOT</fullName>
-                <default>false</default>
-                <label>NOT</label>
+                <label>Update</label>
             </value>
         </valueSetDefinition>
     </valueSet>

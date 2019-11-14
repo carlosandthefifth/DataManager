@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Verb_must_have_value</fullName>
+    <active>true</active>
+    <description>We need to know to insert or update</description>
+    <errorConditionFormula>IF( ISPICKVAL( Verb__c , &#39;&#39;) , true, false)</errorConditionFormula>
+    <errorDisplayField>Verb__c</errorDisplayField>
+    <errorMessage>Verb requires a value</errorMessage>
+</ValidationRule>
