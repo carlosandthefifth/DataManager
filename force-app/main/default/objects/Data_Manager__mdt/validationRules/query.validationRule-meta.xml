@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>query</fullName>
+    <active>true</active>
+    <errorConditionFormula>IF( Use_SOQL__c ,  ISBLANK( query__c ) , false)</errorConditionFormula>
+    <errorDisplayField>query__c</errorDisplayField>
+    <errorMessage>query field cannot be blank</errorMessage>
+</ValidationRule>

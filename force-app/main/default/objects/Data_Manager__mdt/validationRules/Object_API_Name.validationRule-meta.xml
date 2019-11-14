@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Object_API_Name</fullName>
+    <active>true</active>
+    <description>If we are not writing a custom SOQL query, object name cannot be blank</description>
+    <errorConditionFormula>IF( Use_SOQL__c != TRUE,  IF( ISBLANK( Object_API_Name__c ) , true, false) , false)</errorConditionFormula>
+    <errorDisplayField>Object_API_Name__c</errorDisplayField>
+    <errorMessage>Object Name Cannot be blank</errorMessage>
+</ValidationRule>

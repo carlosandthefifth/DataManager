@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Cannot_be_insert_on_use_query</fullName>
+    <active>true</active>
+    <errorConditionFormula>IF( Use_SOQL__c ,  ISPICKVAL( Verb__c , &#39;Insert&#39;) , false)</errorConditionFormula>
+    <errorDisplayField>Verb__c</errorDisplayField>
+    <errorMessage>Verb cannot be insert when Use SOQL  is selected</errorMessage>
+</ValidationRule>

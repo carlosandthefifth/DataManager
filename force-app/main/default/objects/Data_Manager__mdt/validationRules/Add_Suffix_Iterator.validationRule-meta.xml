@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Add_Suffix_Iterator</fullName>
+    <active>true</active>
+    <description>Cannot be used when Use_SOQL is enabled</description>
+    <errorConditionFormula>IF( Use_SOQL__c ,  Add_Suffix_Iterator__c = TRUE, false)</errorConditionFormula>
+    <errorDisplayField>Add_Suffix_Iterator__c</errorDisplayField>
+    <errorMessage>Cannot set Add Suffix Iterator when Use SOQL is checked</errorMessage>
+</ValidationRule>
