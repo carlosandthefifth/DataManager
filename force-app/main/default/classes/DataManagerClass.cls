@@ -82,7 +82,7 @@ public without sharing class DataManagerClass {
             // Build query for total records
             Parameters.add(DataManager.Object_API_Name__c);
             if(DataManager.Verb__c == 'Update') {
-                if(DataManager.Has_Criteria__c) {
+                if((DataManager.Has_Criteria__c) && !(DataManager.Use_Query__c)) {
                     query = 'SELECT ID FROM {0} WHERE {1} {2} {3} LIMIT {4}';
                     // Get the operator
                     if (DataManager.Comparative_Operator__c == 'Equal')
@@ -105,15 +105,25 @@ public without sharing class DataManagerClass {
                     else
                         Parameters.add(DataManager.Compare_Value__c);
                 }  else {
-                    query = 'SELECT ID FROM {0} LIMIT {1}';
+                    if (DataManager.Use_Query__c)
+                        query = DataManager.query__c;
+                    else 
+                        query = 'SELECT ID FROM {0} LIMIT {1}';
                 }
 
-                Parameters.add(string.valueOf(RowsPerTransaction_LIMIT - LIMITS.getQueryRows()));
+                if (!DataManager.Use_Query__c) {
+                    Parameters.add(string.valueOf(RowsPerTransaction_LIMIT - LIMITS.getQueryRows()));
 
-                query = string.format(query,Parameters);
-                
+                    query = string.format(query,Parameters);
+                }
+
                 system.debug('query: ' + query);
-                objects = database.query(query);
+                
+                try {
+                    objects = database.query(query);
+                } catch (Exception e) {
+                    system.debug('on update query error: ' + e.getMessage());
+                }
 
                 TotalRecords = objects.size();
                 system.debug('-- TotalRecords: ' + TotalRecords);
@@ -219,6 +229,7 @@ public without sharing class DataManagerClass {
     @future 
     private static void UpdateRecords(String APIObjectName, String APIFieldName, String APIFieldValue, List<ID> IDsToProcess, boolean Iterator,Integer RecordCount, Integer LastCount, String Compare_Value, String Compare_API_Field_Name, Boolean Value_Is_Blank, Boolean New_Value_Is_Blank)
     {
+        Boolean CanUpdate = true;
         List<ID> ParentIDs = new List<ID>();
         Integer ParentRecordCount = 0;
         String ParentObject = '';
