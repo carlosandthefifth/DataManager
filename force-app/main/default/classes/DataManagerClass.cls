@@ -70,11 +70,11 @@ public without sharing class DataManagerClass {
 
         if (ProjectName == '') {
             // Running all available projects
-            query = 'SELECT Verb__c, Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Has_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c, Use_SOQL__c FROM Data_Manager__mdt WHERE Active__c = true LIMIT ' + DMLPerTransaction_LIMIT;
+            query = 'SELECT Verb__c, Compare_Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Has_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c, Use_Query__c FROM Data_Manager__mdt WHERE Active__c = true LIMIT ' + DMLPerTransaction_LIMIT;
         }
         else {
             // Select a specific project to run
-            query = 'SELECT Verb__c, Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Has_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c FROM Data_Manager__mdt, Use_SOQL__C WHERE Active__c = true  AND Label =:ProjectName LIMIT ' + DMLPerTransaction_LIMIT;
+            query = 'SELECT Verb__c, Compare_Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Has_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c, Use_Query__c FROM Data_Manager__mdt WHERE Active__c = true  AND Label =:ProjectName LIMIT ' + DMLPerTransaction_LIMIT;
         }
         try {
             DataManagerList = database.query(query);
@@ -83,7 +83,7 @@ public without sharing class DataManagerClass {
                 // Build query for total records
                 Parameters.add(DataManager.Object_API_Name__c);
                 if(DataManager.Verb__c == 'Update') {
-                    if((DataManager.Has_Criteria__c) && !(DataManager.Use_SOQL__c)) {
+                    if((DataManager.Has_Criteria__c) && !(DataManager.Use_Query__c)) {
                         query = 'SELECT ID FROM {0} WHERE {1} {2} {3} LIMIT {4}';
                         // Get the operator
                         if (DataManager.Comparative_Operator__c == 'Equal')
@@ -101,18 +101,18 @@ public without sharing class DataManagerClass {
                         
                         Parameters.add(DataManager.Compare_API_Field_Name__c);
                         Parameters.add(ComparativeOperator);    
-                        if (DataManager.Value_Is_Blank__c)
+                        if (DataManager.Compare_Value_Is_Blank__c)
                             Parameters.add(' \' \' ');
                         else
                             Parameters.add(DataManager.Compare_Value__c);
                     }  else {
-                        if (DataManager.Use_SOQL__c)
+                        if (DataManager.Use_Query__c)
                             query = DataManager.query__c;
                         else 
                             query = 'SELECT ID FROM {0} LIMIT {1}';
                     }
 
-                    if (!DataManager.Use_SOQL__c) {
+                    if (!DataManager.Use_Query__c) {
                         Parameters.add(string.valueOf(RowsPerTransaction_LIMIT - LIMITS.getQueryRows()));
 
                         query = string.format(query,Parameters);
@@ -168,6 +168,7 @@ public without sharing class DataManagerClass {
 
                 LastCount = 0;
                 for(Integer BatchKey : RecordsToInsert.keySet()) {
+                    system.debug('RecordsToInsert.get(BatchKey): ' + RecordsToInsert.get(BatchKey));
                         InsertRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, DataManager.Add_Suffix_Iterator__c,RecordsToInsert.get(BatchKey) , LastCount);
                         LastCount += RecordsToInsert.get(BatchKey);
                         if (LIMITS.getFutureCalls() + 1 > FuturePerTransaction_LIMIT) break; // we have reached the maximum number of future calls
@@ -175,7 +176,7 @@ public without sharing class DataManagerClass {
 
                 for (Integer BatchKey : IDsToProcess.keySet()) {
                     system.debug('IDsToProcess.get(' + BatchKey + ').size(): ' + IDsToProcess.get(BatchKey).size());
-                    UpdateRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, IDsToProcess.get(BatchKey), DataManager.Add_Suffix_Iterator__c,IDsToProcess.get(BatchKey).Size(), LastCount, DataManager.Compare_Value__c,DataManager.Compare_API_Field_Name__c, DataManager.Value_Is_Blank__c, DataManager.New_Value_Is_Blank__c);
+                    UpdateRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, IDsToProcess.get(BatchKey), DataManager.Add_Suffix_Iterator__c,IDsToProcess.get(BatchKey).Size(), LastCount, DataManager.Compare_Value__c,DataManager.Compare_API_Field_Name__c, DataManager.Compare_Value_Is_Blank__c, DataManager.New_Value_Is_Blank__c);
                     LastCount += IDsToProcess.get(BatchKey).Size();
                 }            
             }
