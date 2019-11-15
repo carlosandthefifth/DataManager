@@ -17,6 +17,7 @@
 |    -------------------------------------------------------------------------------------------------------------------------------------|
 |==========================================================================================================================================    
 */
+
 public without sharing class DataManagerClass {
 
     public class DataManagerClassException extends Exception {}
@@ -42,6 +43,7 @@ public without sharing class DataManagerClass {
     private static List<SObject> objects = new List<SObject>();
     private static List<String> Parameters = new List<String>();
 
+    
     public DataManagerClass() {
         // Set limit values
         QueriesPerTransaction_LIMIT     = Limits.getLimitQueryRows(); // getQueryRows() 
@@ -51,11 +53,13 @@ public without sharing class DataManagerClass {
         RowsPerTransaction_LIMIT        = Limits.getLimitQueryRows(); // getQueryRows()
     }
 
+    
     public static void execute () {
         String empty = '';
         execute (empty); 
     } 
 
+    
     public static void execute (String ProjectName) 
     { 
         String ComparativeOperator = '';
