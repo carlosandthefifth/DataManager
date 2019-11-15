@@ -9,4 +9,9 @@ package.xml
 **/.eslintrc.json
 
 # LWC Jest
+
 **/__tests__/**
+**/*SessionSetting*
+**/*PasswordPolicy*
+*SessionSetting*
+*PasswordPolicy*
