@@ -5,6 +5,9 @@ global without sharing class DataManagerClassSchedulable implements Schedulable 
       ProcessLabel = name;
    }     
 
+   global DataManagerClassSchedulable () {
+   }     
+
    global void execute(SchedulableContext SC) {
       if (ProcessLabel != '')
          DataManagerClass.execute(ProcessLabel);

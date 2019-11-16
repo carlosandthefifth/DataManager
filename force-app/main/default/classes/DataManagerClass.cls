@@ -43,6 +43,12 @@ public without sharing class DataManagerClass {
     private static List<SObject> objects = new List<SObject>();
     private static List<String> Parameters = new List<String>();
 
+
+    private static Messaging.SingleEmailMessage mail;
+    private static Messaging.Email[] messages = new Messaging.Email[0];
+
+    private static String[] toAddresses;
+
     
     public DataManagerClass() {
         // Set limit values
@@ -59,9 +65,33 @@ public without sharing class DataManagerClass {
         execute (empty); 
     } 
 
+
+    private static Messaging.SingleEmailMessage newMail(String[] toAddresses, String ReplyToAddress, String subject, String DisplayName, String Body) {
+        Messaging.SingleEmailMessage mail =  new Messaging.SingleEmailMessage();
+        
+        mail.setToAddresses(toAddresses);
+
+        mail.setReplyTo(ReplyToAddress);
+
+        mail.setSenderDisplayName(DisplayName);
+
+        mail.setSubject(subject);
+
+        // Set to True if you want to BCC yourself on the email.
+        mail.setBccSender(false);
+
+        mail.setUseSignature(false);
+
+        mail.setPlainTextBody(Body);
+        return mail;
+    }
+
+
+
     
     public static void execute (String ProjectName) 
     { 
+
         String ComparativeOperator = '';
         String query               = '';
         Integer TotalRecords       = 0;
@@ -69,21 +99,40 @@ public without sharing class DataManagerClass {
         Integer RecordIndex        = 0; 
         List<ID> BatchIds          = new List<ID>();
         Integer LastCount          = 0;
+        Boolean Notify             = false;
+        String[] toAddresses;
 
         system.debug('inside execute');
 
         if (ProjectName == '') {
             // Running all available projects
-            query = 'SELECT Verb__c, Compare_Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Use_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c, Use_Query__c, Email_Recipient__c, Email_Notification__c FROM Data_Manager__mdt WHERE Active__c = true LIMIT ' + DMLPerTransaction_LIMIT;
+            query = 'SELECT Verb__c, Compare_Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Use_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c, Use_Query__c, query__c, Email_Recipient__c, Email_Notification__c FROM Data_Manager__mdt WHERE Active__c = true LIMIT ' + (DMLPerTransaction_LIMIT - LIMITS.getDMLStatements());
         }
         else {
             // Select a specific project to run
-            query = 'SELECT Verb__c, Compare_Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Use_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c, Use_Query__c, Email_Recipient__c, Email_Notification__c FROM Data_Manager__mdt WHERE Active__c = true  AND Label =:ProjectName LIMIT ' + DMLPerTransaction_LIMIT;
+            query = 'SELECT Verb__c, Compare_Value_Is_Blank__c, Record_Count__c, Label, Object_API_Name__c, New_Value_Is_Blank__c, New_Value__c, Use_Criteria__c, Compare_Value__c, Comparative_Operator__c, Compare_API_Field_Name__c, API_Field_Name__c, Add_Suffix_Iterator__c, Active__c, Use_Query__c, query__c,Email_Recipient__c, Email_Notification__c FROM Data_Manager__mdt WHERE Active__c = true  AND Label =:ProjectName LIMIT ' + (DMLPerTransaction_LIMIT - LIMITS.getDMLStatements());
         }
         try {
             DataManagerList = database.query(query);
             
             for (Data_Manager__mdt DataManager : DataManagerList) {
+
+                Notify = DataManager.Email_Notification__c;
+
+                if (Notify) {
+                    try{
+                        Messaging.reserveSingleEmailCapacity(1);
+
+                        toAddresses = new String[] {DataManager.Email_Recipient__c}; 
+                
+                    } catch (Exception e) {
+                        Notify = false;
+                        system.debug('Send email fail: ' + e.getMessage());
+                    }
+                }
+
+
+
                 // Build query for total records
                 Parameters.add(DataManager.Object_API_Name__c);
                 if(DataManager.Verb__c == 'Update') {
@@ -107,11 +156,15 @@ public without sharing class DataManagerClass {
                         Parameters.add(ComparativeOperator);    
                         if (DataManager.Compare_Value_Is_Blank__c)
                             Parameters.add(' \' \' ');
-                        else
-                            Parameters.add(DataManager.Compare_Value__c);
+                        else {
+                            if (DataManager.Compare_Value__c == null)
+                                Parameters.add(DataManager.Compare_Value__c); // no quotes
+                            else
+                                Parameters.add(' \'' + DataManager.Compare_Value__c + '\'');
+                        }
                     }  else {
                         if (DataManager.Use_Query__c)
-                            query = DataManager.query__c;
+                            query = DataManager.query__c + ' LIMIT ' + (RowsPerTransaction_LIMIT - LIMITS.getQueryRows());
                         else 
                             query = 'SELECT ID FROM {0} LIMIT {1}';
                     }
@@ -122,11 +175,22 @@ public without sharing class DataManagerClass {
                         query = string.format(query,Parameters);
                     }
 
-                    system.debug('query: ' + query);
-
                     try {
                         objects = database.query(query);
+                        if (Notify) {
+                            // Specify the text content of the email.
+                            mail = newMail(toAddresses,'DataManagerNoReply@MarcusMillichap.com', 'Data Manager - Initial Setup', 'Data Manager', 'query: ' + query + ' Rows returned: ' + objects.size());
+                            if (mail != null)
+                                Messages.add(mail);
+                        }
                     } catch (Exception e) {
+                        if (Notify) {
+                            // Specify the text content of the email.
+                            mail.setPlainTextBody('on update query error: ' + e.getMessage());
+
+                            // Send the email you have created.
+                            Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
+                        }
                         system.debug('on update query error: ' + e.getMessage());
                     }
 
@@ -136,7 +200,7 @@ public without sharing class DataManagerClass {
                     for (SObject obj : objects) {
                         BatchIds.add(obj.id);
                         RecordIndex++;
-                    if (RecordIndex > DMLPerTransaction_LIMIT - 1) {
+                    if (RecordIndex > (DMLPerTransaction_LIMIT -  - LIMITS.getDMLStatements()) - 1) {
                             RecordIndex = 0;
                             IDsToProcess.put(BatchIndex, BatchIds);
                             BatchIndex++;
@@ -154,38 +218,96 @@ public without sharing class DataManagerClass {
 
                     // Break records up into DML Batches
                     BatchIndex = 0;
-                    while (TotalRecords >= DMLPerTransaction_LIMIT) {
-                        if (TotalRecords > DMLPerTransaction_LIMIT) {
-                            RecordsToInsert.put(BatchIndex, DMLPerTransaction_LIMIT);
+                    while (TotalRecords >= (DMLPerTransaction_LIMIT  - LIMITS.getDMLStatements())) {
+                        if (TotalRecords > (DMLPerTransaction_LIMIT - LIMITS.getDMLStatements())) {
+                            RecordsToInsert.put(BatchIndex, ((Integer)DMLPerTransaction_LIMIT - LIMITS.getDMLStatements()));
+                            if (Notify) {
+                                mail = newMail(toAddresses,'DataManagerNoReply@MarcusMillichap.com', 'Data Manager - Initial Setup', 'Data Manager', 'Adding - ' + ((Integer)DMLPerTransaction_LIMIT - LIMITS.getDMLStatements()) + ' For Index: ' + BatchIndex);
+                                if (mail != null)
+                                    Messages.add(mail);                                
+                            }
                         }
                         else {
                             RecordsToInsert.put(BatchIndex, TotalRecords);
+                            if (Notify) {
+                                mail = newMail(toAddresses,'DataManagerNoReply@MarcusMillichap.com', 'Data Manager - Initial Setup', 'Data Manager', 'Adding - ' + TotalRecords + ' For Index: ' + BatchIndex);
+                                if (mail != null)
+                                    Messages.add(mail);                                
+                            }
                         }
-                        TotalRecords -= DMLPerTransaction_LIMIT;
+                        TotalRecords -= (DMLPerTransaction_LIMIT - LIMITS.getDMLStatements());
                         BatchIndex++;
                     }
-                    if (TotalRecords > 0) RecordsToInsert.put(BatchIndex, TotalRecords);
+                    if (TotalRecords > 0) {
+                        RecordsToInsert.put(BatchIndex, TotalRecords);
+                        if (Notify) {
+                            mail = newMail(toAddresses,'DataManagerNoReply@MarcusMillichap.com', 'Data Manager - Initial Setup', 'Data Manager', 'Adding - ' + TotalRecords + ' For Index: ' + BatchIndex);
+                            if (mail != null)
+                                Messages.add(mail);                                
+                        }
+                    }
                     
                 }
 
-                system.debug('TotalRecords: ' + TotalRecords);
 
                 LastCount = 0;
                 for(Integer BatchKey : RecordsToInsert.keySet()) {
-                    system.debug('RecordsToInsert.get(BatchKey): ' + RecordsToInsert.get(BatchKey));
+                        
+                        if (Notify) {
+                            // Specify the text content of the email.
+                            mail = newMail(toAddresses,'DataManagerNoReply@MarcusMillichap.com', 'Data Manager - Initial Setup', 'Data Manager', 'RecordsToInsert.get('+ BatchKey + '): ' + RecordsToInsert.get(BatchKey) + ' For: ' + DataManager.Object_API_Name__c + ' for field: ' + DataManager.API_Field_Name__c);
+                            if (mail != null)
+                                Messages.add(mail);
+
+                        }
+
+
                         InsertRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, DataManager.Add_Suffix_Iterator__c,RecordsToInsert.get(BatchKey) , LastCount, DataManager.Email_Notification__c, DataManager.Email_Recipient__c);
                         LastCount += RecordsToInsert.get(BatchKey);
                         if (LIMITS.getFutureCalls() + 1 > FuturePerTransaction_LIMIT) break; // we have reached the maximum number of future calls
                 }
 
                 for (Integer BatchKey : IDsToProcess.keySet()) {
-                    system.debug('IDsToProcess.get(' + BatchKey + ').size(): ' + IDsToProcess.get(BatchKey).size());
+
+                    if (Notify) {
+                        // Specify the text content of the email.
+                        mail = newMail(toAddresses,'DataManagerNoReply@MarcusMillichap.com', 'Data Manager - Initial Setup', 'Data Manager', 'IDsToProcess.get(' + BatchKey + ').size(): ' + IDsToProcess.get(BatchKey).size());
+
+                        if (mail != null)
+                            Messages.add(mail);
+
+                    }
+
+                    
                     UpdateRecords(DataManager.Object_API_Name__c, DataManager.API_Field_Name__c, DataManager.New_Value__c, IDsToProcess.get(BatchKey), DataManager.Add_Suffix_Iterator__c,IDsToProcess.get(BatchKey).Size(), LastCount, DataManager.Compare_Value__c,DataManager.Compare_API_Field_Name__c, DataManager.Compare_Value_Is_Blank__c, DataManager.New_Value_Is_Blank__c, DataManager.Email_Notification__c, DataManager.Email_Recipient__c);
                     LastCount += IDsToProcess.get(BatchKey).Size();
                 }            
             }
         } catch (Exception e) {
+
+            if (Notify) {
+                // Specify the text content of the email.
+                mail = new Messaging.SingleEmailMessage();
+
+                mail.setPlainTextBody('initial setup: ' + e.getMessage());
+
+                // Send the email you have created.
+                Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
+            }
+
             system.debug('initial setup: ' + e.getMessage());
+        }
+        if (Notify) {
+            if (Messages.size() > 0) {
+                system.debug('we have messages');
+                for (Messaging.Email Message : Messages) {
+                }
+            }
+            else {
+                system.debug('we have no messages');
+                
+            }
+            Messaging.sendEmail(Messages, false);
         }
     }
 
@@ -193,17 +315,46 @@ public without sharing class DataManagerClass {
     @future 
     private static void InsertRecords(String APIObjectName, String APIFieldName, String APIFieldValue, Boolean Iterator, Integer RecordCount, Integer LastCount, Boolean Notify, String RecipientEamil)
     {
+        Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
+
         List<SObject> objects = new List<SObject>();
         List<ID> ParentIDs = new List<ID>();
         Integer ParentRecordCount = 0;
         String ParentObject = '';
         String query = '';
 
+                // Email notification
+        if (Notify) {
+            try{
+                Messaging.reserveSingleEmailCapacity(1);
+
+                String[] toAddresses = new String[] {RecipientEamil}; 
+
+                mail.setToAddresses(toAddresses);
+
+                mail.setReplyTo('DataManagerNoReply@MarcusMillichap.com');
+
+                mail.setSenderDisplayName('Data Manager');
+
+                mail.setSubject('Data Manager Batch Report');
+
+                // Set to True if you want to BCC yourself on the email.
+                mail.setBccSender(false);
+
+                mail.setUseSignature(false);
+
+            } catch (Exception e) {
+                Notify = false;
+                system.debug('Send email fail: ' + e.getMessage());
+            }
+        }
+
+
         // Do we have parent records
         if (APIFieldValue != null) {
             if (APIFieldValue.indexOf('@')==0) {
                 ParentObject = APIFieldValue.Replace('@','');
-                query = 'SELECT ID FROM ' + ParentObject + ' LIMIT ' + DMLPerTransaction_LIMIT;
+                query = 'SELECT ID FROM ' + ParentObject + ' LIMIT ' + (DMLPerTransaction_LIMIT - LIMITS.getDMLStatements());
                 objects = database.query(query);
                 for (SObject obj : objects) {
                     ParentIDs.Add(obj.id);
@@ -234,17 +385,42 @@ public without sharing class DataManagerClass {
             }
             insert objects;
         } catch (Exception e) {
-            System.debug('Error Insert Records ' + e.getMessage());
+            if (Notify) {
+                // Specify the text content of the email.
+                mail.setPlainTextBody('Error Insert Records ' + e.getMessage());
+
+                // Send the email you have created.
+                Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
+            }
+            system.debug('Error Insert Records ' + e.getMessage());
         }
 
         // email notification section
         // Email notification
         if (Notify) {
+            // Specify the text content of the email.
+            mail.setPlainTextBody(RecordCount + ' record(s) were inserted for object ' + APIObjectName);
+
+            // Send the email you have created.
+            Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
+        }    
+    }
+
+    @future 
+    private static void UpdateRecords(String APIObjectName, String APIFieldName, String APIFieldValue, List<ID> IDsToProcess, boolean Iterator,Integer RecordCount, Integer LastCount, String Compare_Value, String Compare_API_Field_Name, Boolean Value_Is_Blank, Boolean New_Value_Is_Blank, Boolean Notify, String RecipientEamil)
+    {
+        Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
+
+        Boolean CanUpdate = true;
+        List<ID> ParentIDs = new List<ID>();
+        Integer ParentRecordCount = 0;
+        String ParentObject = '';
+        String query = '';
+
+        // Email notification
+        if (Notify) {
             try{
-
                 Messaging.reserveSingleEmailCapacity(1);
-
-                Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
 
                 String[] toAddresses = new String[] {RecipientEamil}; 
 
@@ -252,7 +428,6 @@ public without sharing class DataManagerClass {
 
                 mail.setReplyTo('DataManagerNoReply@MarcusMillichap.com');
 
- 
                 mail.setSenderDisplayName('Data Manager');
 
                 mail.setSubject('Data Manager Batch Report');
@@ -262,31 +437,17 @@ public without sharing class DataManagerClass {
 
                 mail.setUseSignature(false);
 
-                // Specify the text content of the email.
-                mail.setPlainTextBody(RecordCount + ' record(s) were inserted for object ' + APIObjectName);
-
-                // Send the email you have created.
-                Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
-
             } catch (Exception e) {
+                Notify = false;
                 system.debug('Send email fail: ' + e.getMessage());
             }
         }
-    }
 
-    @future 
-    private static void UpdateRecords(String APIObjectName, String APIFieldName, String APIFieldValue, List<ID> IDsToProcess, boolean Iterator,Integer RecordCount, Integer LastCount, String Compare_Value, String Compare_API_Field_Name, Boolean Value_Is_Blank, Boolean New_Value_Is_Blank, Boolean Notify, String RecipientEamil)
-    {
-        Boolean CanUpdate = true;
-        List<ID> ParentIDs = new List<ID>();
-        Integer ParentRecordCount = 0;
-        String ParentObject = '';
-        String query = '';
 
         system.debug('inside updaterecords');
         if (APIFieldValue.indexOf('@')==0) {
             ParentObject = APIFieldValue.Replace('@','');
-            query = 'SELECT ID FROM ' + ParentObject + ' LIMIT ' + DMLPerTransaction_LIMIT;
+            query = 'SELECT ID FROM ' + ParentObject + ' LIMIT ' + (DMLPerTransaction_LIMIT - LIMITS.getDMLStatements());
             objects = database.query(query);
             for (SObject obj : objects) {
                 ParentIDs.Add(obj.id);
@@ -294,7 +455,7 @@ public without sharing class DataManagerClass {
         }
 
         system.debug('ParentIDs.Size(): ' + ParentIDs.size());
-        query = 'SELECT ID, ' + APIFieldName + ' FROM ' + APIObjectName + ' WHERE ID IN :IDsToProcess LIMIT ' + DMLPerTransaction_LIMIT;
+        query = 'SELECT ID, ' + APIFieldName + ' FROM ' + APIObjectName + ' WHERE ID IN :IDsToProcess LIMIT ' + (DMLPerTransaction_LIMIT  - LIMITS.getDMLStatements());
         system.debug('Update Records query: ' + query);
         List<SObject> objects = database.query(query);
 
@@ -310,46 +471,33 @@ public without sharing class DataManagerClass {
                     obj.put(APIFieldName,APIFieldValue);
                 }
             } catch (Exception e) {
-                system.debug('UpdateRecords ' + e.getMessage());
+                if (Notify) {
+                    // Specify the text content of the email.
+                    mail.setPlainTextBody('UpdateRecords ' + e.getMessage());
+
+                    // Send the email you have created.
+                    Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
+                }
             }
         }
         try {
             Update objects;
         } catch (Exception e) {
-            system.debug('Update Objects - UpdateRecords: ' + e.getMessage());
-        }
-
-        // Email notification
-        if (Notify) {
-            try{
-                Messaging.reserveSingleEmailCapacity(1);
-
-                Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
-
-                String[] toAddresses = new String[] {RecipientEamil}; 
-
-                mail.setToAddresses(toAddresses);
-
-                mail.setReplyTo('DataManagerNoReply@MarcusMillichap.com');
-
-                mail.setSenderDisplayName('Data Manager');
-
-                mail.setSubject('Data Manager Batch Report');
-
-                // Set to True if you want to BCC yourself on the email.
-                mail.setBccSender(false);
-
-                mail.setUseSignature(false);
-
+            if (Notify) {
                 // Specify the text content of the email.
-                mail.setPlainTextBody(RecordCount + ' record(s) were updated for object ' + APIObjectName);
+                mail.setPlainTextBody('Update Objects - UpdateRecords: ' + e.getMessage());
 
                 // Send the email you have created.
                 Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
-
-            } catch (Exception e) {
-                system.debug('Send email fail: ' + e.getMessage());
             }
+        }
+
+        if (Notify) {
+            // Specify the text content of the email.
+            mail.setPlainTextBody(RecordCount + ' record(s) were updated for object ' + APIObjectName);
+
+            // Send the email you have created.
+            Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
         }
     }
 }

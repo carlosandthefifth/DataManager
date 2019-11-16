@@ -59,4 +59,6 @@ Deploy your changes to production using [packaging](https://developer.salesforce
 
 https://login.salesforce.com/packaging/installPackage.apexp?p0=04t1I000003cvqTQAQ
 
-packaging/installPackage.apexp?p0=04t1I000003cvvUQAQ
+packaging/installPackage.apexp?p0=04t1I000003cvwNQAQ
+
+https://login.salesforce.com/packaging/installPackage.apexp?p0=04t1I000003cvx1QAA
