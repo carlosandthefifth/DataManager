@@ -7,8 +7,10 @@
 |    Date: November 7, 2019                                                                                                               |  
 |                                                                                                                                         |
 |   Purpose:                                                                                                                              |  
-|    Provides a solution to mass update large record sets (greater 10000) declaratively                                                   |  
-|                                                                                                                                         |  
+|    Provides a solution to mass update large record sets (greater 10000) declaratively     
+|  
+|    Feature Roadmap:
+|      * Allow to update multiple fields.  Example: Cannot mass insert opportunities without updating status and closedate 
 |    -------------------------------------------------------------------------------------------------------------------------------      |
 |    |Version| Contributor            |Date      |Description/Reason                                                                      |  
 |    ------------------------------------------------------------------------------------------------------------------------------       |
